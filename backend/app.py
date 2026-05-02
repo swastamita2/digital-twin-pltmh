@@ -35,9 +35,9 @@ CORS(app)
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), 'data', 'dataset_pltmh.csv')
 
-# Cache
+# Cache variables
 _cached_data = None
-
+_cached_mtime = 0
 
 # ═══════════════════════════════════════════════════════
 # DATA LOADING
@@ -65,12 +65,20 @@ def load_data():
             })
     return data
 
-
 def get_data():
-    """Get cached data."""
-    global _cached_data
-    if _cached_data is None:
+    """Get data with smart cache invalidation (checks file modification time)."""
+    global _cached_data, _cached_mtime
+    
+    if not os.path.exists(DATA_PATH):
         _cached_data = load_data()
+        _cached_mtime = os.path.getmtime(DATA_PATH)
+        return _cached_data
+        
+    current_mtime = os.path.getmtime(DATA_PATH)
+    if _cached_data is None or current_mtime > _cached_mtime:
+        _cached_data = load_data()
+        _cached_mtime = current_mtime
+        
     return _cached_data
 
 
@@ -78,48 +86,31 @@ def get_data():
 # SENSOR INFO
 # ═══════════════════════════════════════════════════════
 
-SENSORS = [
-    {
-        'id': 'flow_sensor',
-        'name': 'YF-S201',
-        'type': 'Flow Rate Sensor',
-        'parameter': 'flow_rate',
-        'unit': 'm³/s',
-        'price_idr': 80_000,
-        'price_usd': 5,
-        'status': 'online',
+EDGE_METRICS = {
+    'device': {
+        'name': 'Edge Computing Node (Simulated)',
+        'type': 'Local Processing Unit',
+        'specs': 'Quad-Core CPU, 4GB RAM, Local Buffer Storage',
     },
-    {
-        'id': 'vibration_sensor',
-        'name': 'ADXL345',
-        'type': 'Accelerometer / Vibration',
-        'parameter': 'vibration',
-        'unit': 'mm/s',
-        'price_idr': 130_000,
-        'price_usd': 8,
-        'status': 'online',
+    'performance': {
+        'cpu_load_pct': 12.4,
+        'memory_used_mb': 450,
+        'latency_ms': 2.3,
+        'uptime_hours': 2451,
     },
-    {
-        'id': 'temp_sensor',
-        'name': 'DS18B20',
-        'type': 'Temperature Sensor',
-        'parameter': 'gen_temp',
-        'unit': '°C',
-        'price_idr': 32_000,
-        'price_usd': 2,
-        'status': 'online',
+    'network': {
+        'status': 'intermittent',
+        'raw_data_size_kb_per_hour': 72.0,
+        'transmitted_size_kb_per_hour': 0.4,
+        'bandwidth_saved_pct': 99.4,
     },
-    {
-        'id': 'power_sensor',
-        'name': 'INA219',
-        'type': 'Voltage/Current Sensor',
-        'parameter': 'voltage,current',
-        'unit': 'V / A',
-        'price_idr': 80_000,
-        'price_usd': 5,
-        'status': 'online',
-    },
-]
+    'data_nodes': [
+        {'id': 'flow_sim', 'name': 'Flow Model', 'parameter': 'flow_rate', 'status': 'active', 'type': 'Hydraulic Node'},
+        {'id': 'vib_sim', 'name': 'Vibration Model', 'parameter': 'vibration', 'status': 'active', 'type': 'Mechanical Node'},
+        {'id': 'temp_sim', 'name': 'Temp Model', 'parameter': 'gen_temp', 'status': 'active', 'type': 'Thermal Node'},
+        {'id': 'elec_sim', 'name': 'Electrical Model', 'parameter': 'voltage,current', 'status': 'active', 'type': 'Electrical Node'},
+    ]
+}
 
 
 # ═══════════════════════════════════════════════════════
@@ -275,38 +266,10 @@ def get_thresholds():
     return jsonify(THRESHOLDS)
 
 
-@app.route('/api/sensors', methods=['GET'])
-def get_sensors():
-    """Get edge sensor information."""
-    total_cost_idr = sum(s['price_idr'] for s in SENSORS)
-    total_cost_usd = sum(s['price_usd'] for s in SENSORS)
-    
-    # Add Raspberry Pi
-    edge_device = {
-        'name': 'Raspberry Pi 4 Model B',
-        'type': 'Edge Computing Device',
-        'price_idr': 900_000,
-        'price_usd': 55,
-        'specs': 'ARM Cortex-A72, 4GB RAM, WiFi, GPIO 40-pin',
-    }
-    
-    misc = {
-        'name': 'Kabel, Housing, Power Supply',
-        'price_idr': 400_000,
-        'price_usd': 25,
-    }
-    
-    grand_total_idr = total_cost_idr + edge_device['price_idr'] + misc['price_idr']
-    grand_total_usd = total_cost_usd + edge_device['price_usd'] + misc['price_usd']
-
-    return jsonify({
-        'edge_device': edge_device,
-        'sensors': SENSORS,
-        'misc': misc,
-        'total_sensor_cost_idr': total_cost_idr,
-        'grand_total_idr': grand_total_idr,
-        'grand_total_usd': grand_total_usd,
-    })
+@app.route('/api/edge-status', methods=['GET'])
+def get_edge_status():
+    """Get edge computing simulation metrics."""
+    return jsonify(EDGE_METRICS)
 
 
 if __name__ == '__main__':

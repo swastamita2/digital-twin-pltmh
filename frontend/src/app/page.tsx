@@ -3,12 +3,13 @@
 import React, { useState } from 'react';
 import dynamic from 'next/dynamic';
 import MetricChartCard from '@/components/cards/MetricChartCard';
+import EdgeSensorStatus from '@/components/widgets/EdgeSensorStatus';
 import { useDigitalTwinData } from '@/hooks/useDataFetching';
 import {
   Activity, Droplets, Zap, RefreshCw, Server, Waves, Shield, Thermometer,
   CloudRain, Calendar, Bell, User, Clock, Battery, Sun, Maximize, RotateCcw, Box
 } from 'lucide-react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, ReferenceLine } from 'recharts';
 
 // Dynamic import for 3D component
 const Turbine3D = dynamic(() => import('@/components/widgets/Turbine3D'), {
@@ -20,36 +21,15 @@ const Turbine3D = dynamic(() => import('@/components/widgets/Turbine3D'), {
   ),
 });
 
-const MOCK_TIMESERIES = Array.from({ length: 24 }).map((_, i) => ({
-  time: `10:${i.toString().padStart(2, '0')}`,
-  power_kw: 240 + Math.sin(i) * 10,
-  flow_rate: 1.8 + Math.cos(i) * 0.1,
-  efficiency: 88 + Math.sin(i) * 2,
-  load: 80 + Math.cos(i) * 2,
-  frequency: 50 + (Math.sin(i) * 0.1),
-  gen_temp: 68 + Math.cos(i) * 2,
-  water_temp: 18 + Math.sin(i),
-  intake_level: 1.4 + Math.cos(i) * 0.1,
-  tailrace_level: 0.9 + Math.sin(i) * 0.1,
-}));
+
 
 export default function Dashboard() {
   const {
-    timeseries, summary, components, alertsInfo,
+    timeseries, chartData, summary, components, alertsInfo, edgeMetrics,
     loading, error, refresh,
   } = useDigitalTwinData();
 
-  // Map real data to include UI-required fields missing from the backend schema, falling back to mock data
-  const chartData = timeseries && timeseries.length > 0 ? timeseries.map(pt => ({
-    ...pt,
-    time: pt.date ? new Date(pt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '00:00',
-    efficiency: pt.power_kw ? Math.min(100, (pt.power_kw / 50) * 100) : 88,
-    load: pt.power_kw ? Math.min(100, (pt.power_kw / 50) * 100) : 80,
-    frequency: 50 + (Math.random() * 0.2 - 0.1),
-    water_temp: 18 + Math.random(),
-    intake_level: 1.4 + Math.random() * 0.1,
-    tailrace_level: 0.9 + Math.random() * 0.1,
-  })) : MOCK_TIMESERIES;
+
 
   const energyProductionData = [
     { name: '00:00 - 06:00', value: 0.68, color: '#3b82f6' }, // Blue
@@ -144,11 +124,11 @@ export default function Dashboard() {
       <main className="max-w-[1400px] mx-auto px-4 mt-6 space-y-4">
         {/* ═══ ROW 1: KPI Cards ═══ */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <MetricChartCard title="Power Output" value="245.6" unit="kW" icon={Zap} color="emerald" data={chartData} dataKey="power_kw" />
-          <MetricChartCard title="Water Flow" value="1.82" unit="m³/s" icon={Waves} color="blue" data={chartData} dataKey="flow_rate" />
-          <MetricChartCard title="Efficiency" value="89" unit="%" icon={Activity} color="emerald" data={chartData} dataKey="efficiency" />
-          <MetricChartCard title="Load" value="81" unit="%" icon={Activity} color="teal" data={chartData} dataKey="load" />
-          <MetricChartCard title="Frequency" value="50.00" unit="Hz" icon={Activity} color="emerald" data={chartData} dataKey="frequency" />
+          <MetricChartCard title="Power Output" value="245.6" unit="kW" icon={Zap} color="emerald" data={chartData} dataKey="power_kw" thresholdLimit={250} />
+          <MetricChartCard title="Water Flow" value="1.82" unit="m³/s" icon={Waves} color="blue" data={chartData} dataKey="flow_rate" thresholdLimit={2.0} />
+          <MetricChartCard title="Efficiency" value="89" unit="%" icon={Activity} color="emerald" data={chartData} dataKey="efficiency" thresholdLimit={95} />
+          <MetricChartCard title="Load" value="81" unit="%" icon={Activity} color="teal" data={chartData} dataKey="load" thresholdLimit={90} />
+          <MetricChartCard title="Frequency" value="50.00" unit="Hz" icon={Activity} color="emerald" data={chartData} dataKey="frequency" thresholdLimit={50.5} />
         </div>
 
         {/* ═══ ROW 2: 3D Visualization & System Status ═══ */}
@@ -234,12 +214,12 @@ export default function Dashboard() {
           <h3 className="text-base font-bold text-slate-800 mb-4">Real-time Monitoring</h3>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
             {[
-              { title: 'Power Output', value: '245.6', unit: 'kW', dataKey: 'power_kw', color: '#10b981', icon: Zap },
-              { title: 'Load', value: '81', unit: '%', dataKey: 'load', color: '#14b8a6', icon: Activity },
-              { title: 'Water Flow', value: '1.82', unit: 'm³/s', dataKey: 'flow_rate', color: '#3b82f6', icon: Waves },
-              { title: 'Frequency', value: '50.0', unit: 'Hz', dataKey: 'frequency', color: '#10b981', icon: Activity },
-              { title: 'Generator Temperature', value: '68.5', unit: '°C', dataKey: 'gen_temp', color: '#10b981', icon: Thermometer },
-              { title: 'Water Temperature', value: '18.6', unit: '°C', dataKey: 'water_temp', color: '#10b981', icon: Thermometer },
+              { title: 'Power Output', value: '245.6', unit: 'kW', dataKey: 'power_kw', color: '#10b981', icon: Zap, threshold: 250 },
+              { title: 'Load', value: '81', unit: '%', dataKey: 'load', color: '#14b8a6', icon: Activity, threshold: 90 },
+              { title: 'Water Flow', value: '1.82', unit: 'm³/s', dataKey: 'flow_rate', color: '#3b82f6', icon: Waves, threshold: 2.0 },
+              { title: 'Frequency', value: '50.0', unit: 'Hz', dataKey: 'frequency', color: '#10b981', icon: Activity, threshold: 50.5 },
+              { title: 'Generator Temperature', value: '68.5', unit: '°C', dataKey: 'gen_temp', color: '#10b981', icon: Thermometer, threshold: 75.0 },
+              { title: 'Water Temperature', value: '18.6', unit: '°C', dataKey: 'water_temp', color: '#10b981', icon: Thermometer, threshold: 25.0 },
             ].map((chart, i) => (
               <div key={i} className="border border-slate-100 rounded-lg p-3">
                 <div className="flex items-center gap-1 mb-1">
@@ -265,6 +245,7 @@ export default function Dashboard() {
                         labelStyle={{ display: 'none' }}
                       />
                       <Area type="monotone" dataKey={chart.dataKey} stroke={chart.color} fillOpacity={1} fill={`url(#grad-${i})`} isAnimationActive={false} />
+                      <ReferenceLine y={chart.threshold} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -477,7 +458,7 @@ export default function Dashboard() {
         {/* ═══ ROW 6: Alerts & Plant Status ═══ */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* Alerts & Notifications */}
-          <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base font-bold text-slate-800">Alerts & Notifications</h3>
               <button className="text-[10px] font-medium text-slate-500 hover:text-slate-700">View all</button>
@@ -503,6 +484,11 @@ export default function Dashboard() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Edge Computing Status */}
+          <div className="lg:col-span-1">
+            {edgeMetrics && <EdgeSensorStatus metrics={edgeMetrics} />}
           </div>
 
           {/* Plant Status Photo Card */}
