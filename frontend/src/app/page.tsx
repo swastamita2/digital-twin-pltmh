@@ -134,20 +134,9 @@ export default function Dashboard() {
         {/* ═══ ROW 2: 3D Visualization & System Status ═══ */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* 3D Visualization */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden relative min-h-[450px]">
-            <div className="absolute top-4 left-4 z-10 flex items-center gap-3">
-              <h2 className="text-white font-semibold drop-shadow-md">3D Plant Visualization</h2>
-              <span className="px-2 py-0.5 bg-teal-500/80 text-white text-[10px] rounded-full flex items-center gap-1 backdrop-blur-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> Live
-              </span>
-            </div>
-            <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-              <button className="p-2 bg-[#04384D]/80 backdrop-blur-md rounded-lg text-white hover:bg-[#04384D]"><RotateCcw className="w-4 h-4" /></button>
-              <button className="p-2 bg-[#04384D]/80 backdrop-blur-md rounded-lg text-white hover:bg-[#04384D]"><Box className="w-4 h-4" /></button>
-              <button className="p-2 bg-[#04384D]/80 backdrop-blur-md rounded-lg text-white hover:bg-[#04384D]"><Maximize className="w-4 h-4" /></button>
-            </div>
+          <div className="lg:col-span-2 relative min-h-[450px]">
             {/* The actual 3D container */}
-            <div className="w-full h-[450px] bg-gradient-to-b from-[#4A6670] to-[#2B3A42]">
+            <div className="w-full h-full">
                {summary && <Turbine3D summary={summary} components={components || undefined} />}
             </div>
           </div>
@@ -218,7 +207,7 @@ export default function Dashboard() {
               { title: 'Load', value: '81', unit: '%', dataKey: 'load', color: '#14b8a6', icon: Activity, threshold: 90 },
               { title: 'Water Flow', value: '1.82', unit: 'm³/s', dataKey: 'flow_rate', color: '#3b82f6', icon: Waves, threshold: 2.0 },
               { title: 'Frequency', value: '50.0', unit: 'Hz', dataKey: 'frequency', color: '#10b981', icon: Activity, threshold: 50.5 },
-              { title: 'Generator Temperature', value: '68.5', unit: '°C', dataKey: 'gen_temp', color: '#10b981', icon: Thermometer, threshold: 75.0 },
+              { title: 'Bearing Temperature', value: '68.5', unit: '°C', dataKey: 'gen_temp', color: '#10b981', icon: Thermometer, threshold: 75.0 },
               { title: 'Water Temperature', value: '18.6', unit: '°C', dataKey: 'water_temp', color: '#10b981', icon: Thermometer, threshold: 25.0 },
             ].map((chart, i) => (
               <div key={i} className="border border-slate-100 rounded-lg p-3">
@@ -274,7 +263,9 @@ export default function Dashboard() {
                     <circle cx="50" cy="50" r="40" stroke="#0f766e" strokeWidth="8" fill="none" strokeDasharray="251.2" strokeDashoffset="62.8" className="transition-all duration-1000" />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-xl font-bold text-slate-800">750</span>
+                    <span className="text-xl font-bold text-slate-800">
+                      {summary?.turbine_active ? Math.round(750 + (Math.random() * 4 - 2)) : 0}
+                    </span>
                     <span className="text-[10px] text-slate-400">rpm</span>
                   </div>
                 </div>
@@ -393,9 +384,9 @@ export default function Dashboard() {
                 {/* Intake Level */}
                 <div>
                   <div className="flex justify-between items-end mb-1">
-                    <span className="text-[11px] text-slate-500">Intake Level</span>
+                    <span className="text-[11px] text-slate-500">Inlet Pressure</span>
                   </div>
-                  <div className="text-lg font-bold text-slate-800 mb-1">1.45 <span className="text-[10px] font-normal text-slate-500">m</span></div>
+                  <div className="text-lg font-bold text-slate-800 mb-1">1.45 <span className="text-[10px] font-normal text-slate-500">bar</span></div>
                   <div className="h-12 w-full border border-slate-100 rounded p-1">
                      <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={chartData}>

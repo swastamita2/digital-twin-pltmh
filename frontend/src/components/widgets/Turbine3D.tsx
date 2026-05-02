@@ -435,7 +435,7 @@ function TurbineScene({ summary, components }: { summary: SummaryData; component
         {/* Labels Map exactly to Sensor Locations */}
         <StatusLabel
           position={[0, 1.0, -1.0]}
-          label="Getaran Bearing"
+          label="Vibrasi Turbin"
           sensorName="ADXL345"
           value={summary.current.vibration.toFixed(1)}
           unit="mm/s"
@@ -443,7 +443,7 @@ function TurbineScene({ summary, components }: { summary: SummaryData; component
         />
         <StatusLabel
           position={[-2.5, 1.5, 0]}
-          label="Suhu Generator"
+          label="Suhu Bearing"
           sensorName="DS18B20"
           value={summary.current.gen_temp.toFixed(0)}
           unit="°C"
