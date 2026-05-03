@@ -304,15 +304,15 @@ def calculate_techno_economics():
     - Target predictive: Rp 15-20 juta/tahun
     - Sensor investment: < USD 200 ≈ Rp 3.2 juta
     """
-    # Investment costs (Rp)
+    # Investment costs (Rp) - Berdasarkan estimasi implementasi framework
     investment = {
-        'raspberry_pi_4b': 900_000,     # ~$55
-        'flow_sensor_yfs201': 80_000,    # ~$5
-        'vibration_adxl345': 130_000,    # ~$8
-        'temp_ds18b20': 32_000,          # ~$2
-        'voltage_current_ina219': 80_000, # ~$5
-        'misc_cables_housing': 400_000,   # ~$25
-        'installation_labor': 500_000,    # Local technician
+        'edge_computing_unit': 900_000,  # Estimasi unit processing lokal
+        'hydraulic_sim_node': 80_000,   # Modul akuisisi data hidrolik
+        'mechanical_sim_node': 130_000, # Modul akuisisi data mekanik
+        'thermal_sim_node': 32_000,      # Modul akuisisi data termal
+        'electrical_sim_node': 80_000,   # Modul akuisisi data elektrikal
+        'system_infrastructure': 400_000, # Kabel dan casing pelindung
+        'system_integration': 500_000,    # Jasa integrasi dan kalibrasi sistem
     }
     total_investment = sum(investment.values())
     

@@ -102,7 +102,7 @@ export default function TechnoEconomicPanel({ data }: Props) {
       {/* Investment detail */}
       <div className="mt-4 pt-3 border-t border-slate-100">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-slate-400 flex items-center gap-1"><DollarSign className="w-3 h-3" /> Total Investasi Sensor</span>
+          <span className="text-[11px] text-slate-400 flex items-center gap-1"><DollarSign className="w-3 h-3" /> Total Investasi Sistem</span>
           <span className="text-xs font-mono font-semibold text-slate-600">{formatRupiah(data.total_investment)} (USD {data.total_investment_usd})</span>
         </div>
         <p className="text-[10px] text-slate-400 mt-1">Discount rate: {data.discount_rate_pct}% · Periode: {data.analysis_period_years} tahun</p>

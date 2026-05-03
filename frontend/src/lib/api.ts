@@ -112,30 +112,31 @@ export interface AlertsResponse {
   alerts: Alert[];
 }
 
-export interface SensorInfo {
-  id: string;
-  name: string;
-  type: string;
-  parameter: string;
-  unit: string;
-  price_idr: number;
-  price_usd: number;
-  status: string;
-}
-
-export interface SensorsResponse {
-  edge_device: {
+export interface EdgeMetricsResponse {
+  device: {
     name: string;
     type: string;
-    price_idr: number;
-    price_usd: number;
     specs: string;
   };
-  sensors: SensorInfo[];
-  misc: { name: string; price_idr: number; price_usd: number };
-  total_sensor_cost_idr: number;
-  grand_total_idr: number;
-  grand_total_usd: number;
+  performance: {
+    cpu_load_pct: number;
+    memory_used_mb: number;
+    latency_ms: number;
+    uptime_hours: number;
+  };
+  network: {
+    status: string;
+    raw_data_size_kb_per_hour: number;
+    transmitted_size_kb_per_hour: number;
+    bandwidth_saved_pct: number;
+  };
+  data_nodes: {
+    id: string;
+    name: string;
+    parameter: string;
+    status: string;
+    type: string;
+  }[];
 }
 
 export interface TechnoEconomics {
@@ -188,5 +189,5 @@ export const fetchAlerts = (): Promise<AlertsResponse> =>
 export const fetchTechnoEconomics = (): Promise<TechnoEconomics> =>
   fetchJSON(`${API_BASE_URL}/techno-economics`);
 
-export const fetchSensors = (): Promise<SensorsResponse> =>
-  fetchJSON(`${API_BASE_URL}/sensors`);
+export const fetchEdgeStatus = (): Promise<EdgeMetricsResponse> =>
+  fetchJSON(`${API_BASE_URL}/edge-status`);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, ReferenceLine } from 'recharts';
 
 interface MetricChartCardProps<T> {
   title: string;
@@ -10,6 +10,7 @@ interface MetricChartCardProps<T> {
   data: T[];
   dataKey: Extract<keyof T, string> | string;
   color: 'teal' | 'blue' | 'amber' | 'emerald' | 'rose' | 'violet';
+  thresholdLimit?: number;
 }
 
 const colorMap = {
@@ -27,8 +28,9 @@ const statusDot = {
   critical: 'bg-rose-500 animate-pulse',
 };
 
-export default function MetricChartCard<T>({ title, value, unit, icon: Icon, status = 'normal', data, dataKey, color }: MetricChartCardProps<T>) {
+export default function MetricChartCard<T>({ title, value, unit, icon: Icon, status = 'normal', data, dataKey, color, thresholdLimit }: MetricChartCardProps<T>) {
   const chartColor = colorMap[color];
+  const stringDataKey = String(dataKey);
 
   return (
     <div className="bg-white rounded-xl border border-slate-200/60 p-4 shadow-sm flex flex-col justify-between">
@@ -56,12 +58,15 @@ export default function MetricChartCard<T>({ title, value, unit, icon: Icon, sta
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data}>
               <defs>
-                <linearGradient id={`color-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={`color-${stringDataKey}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={chartColor} stopOpacity={0.3}/>
                   <stop offset="95%" stopColor={chartColor} stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <Area type="monotone" dataKey={dataKey} stroke={chartColor} strokeWidth={2} fillOpacity={1} fill={`url(#color-${dataKey})`} isAnimationActive={false} />
+              <Area type="monotone" dataKey={dataKey as any} stroke={chartColor} strokeWidth={2} fillOpacity={1} fill={`url(#color-${stringDataKey})`} isAnimationActive={false} />
+              {thresholdLimit !== undefined && (
+                <ReferenceLine y={thresholdLimit} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1} />
+              )}
             </AreaChart>
           </ResponsiveContainer>
         </div>
