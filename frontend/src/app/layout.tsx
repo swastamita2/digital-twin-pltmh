@@ -14,7 +14,7 @@ const jetBrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Digital Twin PLTMH Dashboard",
-  description: "Sistem Pemantauan dan Analitik Prediktif Digital Twin PLTMH menggunakan Single LSTM",
+  description: "Sistem pemantauan dan analitik prediktif Digital Twin PLTMH berbasis Edge Computing dan SPC",
 };
 
 export default function RootLayout({

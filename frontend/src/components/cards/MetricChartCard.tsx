@@ -54,8 +54,8 @@ export default function MetricChartCard<T>({ title, value, unit, icon: Icon, sta
           <span className={`w-2 h-2 rounded-full ${statusDot[status]}`}></span>
           <span className="text-[10px] font-medium text-slate-500 capitalize">{status}</span>
         </div>
-        <div className="h-8 w-24">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-8 w-24 min-w-0">
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <AreaChart data={data}>
               <defs>
                 <linearGradient id={`color-${stringDataKey}`} x1="0" y1="0" x2="0" y2="1">

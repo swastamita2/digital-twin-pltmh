@@ -34,3 +34,8 @@ Pastikan komputer/laptop Anda telah menginstal:
 ## 🛠️ Penyelesaian Masalah (Troubleshooting)
 - Jika gagal menjalankan script karena Execution Policy Windows, jalankan perintah ini di PowerShell sebagai Administrator terlebih dahulu: `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`
 - Untuk menghentikan sistem, cukup tutup jendela PowerShell atau tekan `Ctrl + C` pada masing-masing terminal.
+
+# Jalankan script inject menggunakan python dari venv
+.\backend\venv\Scripts\python.exe .\backend\inject_anomaly.py
+# Jalankan script restore menggunakan python dari venv
+.\backend\venv\Scripts\python.exe .\backend\restore_normal.py

@@ -12,6 +12,8 @@ export interface DataPoint {
   voltage: number;
   current: number;
   power_kw: number;
+  head_pressure?: number;
+  rpm?: number;
   anomaly_label?: string;
 }
 
@@ -23,6 +25,8 @@ export interface SummaryData {
     voltage: number;
     current: number;
     power_kw: number;
+    head_pressure?: number;
+    rpm?: number;
   };
   avg_7d: {
     flow_rate: number;
@@ -174,8 +178,10 @@ export const fetchTimeseries = (days = 60): Promise<DataPoint[]> =>
 export const fetchSummary = (): Promise<SummaryData> =>
   fetchJSON(`${API_BASE_URL}/data/summary`);
 
-export const fetchSPC = (parameter: string, days = 60): Promise<SPCData> =>
-  fetchJSON(`${API_BASE_URL}/spc/${parameter}?days=${days}`);
+export const fetchSPC = (parameter: string, days = 60, useResidual?: boolean): Promise<SPCData> => {
+  const residualQuery = useResidual === undefined ? '' : `&residual=${useResidual ? 'true' : 'false'}`;
+  return fetchJSON(`${API_BASE_URL}/spc/${parameter}?days=${days}${residualQuery}`);
+};
 
 export const fetchAnomalies = (days = 30): Promise<AnomaliesResponse> =>
   fetchJSON(`${API_BASE_URL}/anomalies?days=${days}`);

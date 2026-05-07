@@ -1,524 +1,375 @@
 "use client";
 
-import React, { useRef, useMemo, Suspense } from 'react';
+import React, { Suspense, useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, ContactShadows, Html } from '@react-three/drei';
+import { OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { SummaryData, ComponentsResponse } from '@/lib/api';
 
 // ═══════════════════════════════════════════════════════
-// CROSS-FLOW TURBINE & BOXY CASING
+// PRELOAD MODEL — triggers loading before component mounts
 // ═══════════════════════════════════════════════════════
-function TurbineAssembly({ rotationSpeed = 1 }: { rotationSpeed: number }) {
-  const runnerRef = useRef<THREE.Group>(null!);
+useGLTF.preload('/turbin-cf.glb');
 
-  useFrame((_state, delta) => {
-    if (runnerRef.current) {
-      runnerRef.current.rotation.z -= delta * rotationSpeed; // Negative to spin correctly with flow
-    }
+// ═══════════════════════════════════════════════════════
+// HELPERS — warna status untuk material bearing
+// ═══════════════════════════════════════════════════════
+function statusToColor(status: string): THREE.Color {
+  if (status === 'critical') return new THREE.Color(0xef4444); // merah
+  if (status === 'warning')  return new THREE.Color(0xf59e0b); // amber
+  return new THREE.Color(0x10b981);                             // hijau (normal)
+}
+
+function applyBearingMaterial(
+  mesh: THREE.Object3D | null,
+  status: string,
+) {
+  if (!mesh) return;
+  mesh.traverse((child) => {
+    const m = child as THREE.Mesh;
+    if (!m.isMesh || !m.material) return;
+
+    // Clone material per-mesh agar tidak mutasi shared material
+    const src = Array.isArray(m.material) ? m.material[0] : m.material;
+    const mat = (src as THREE.MeshStandardMaterial).clone() as THREE.MeshStandardMaterial;
+    const col = statusToColor(status);
+    mat.color.copy(col);
+    mat.emissive.copy(col);
+    mat.emissiveIntensity = status !== 'normal' ? 0.45 : 0.05;
+    mat.needsUpdate = true;
+    m.material = mat;
   });
-
-  const bladeCount = 20;
-  const radius = 0.6;
-  const length = 1.4;
-
-  const blades = useMemo(() => {
-    const items = [];
-    for (let i = 0; i < bladeCount; i++) {
-      items.push({ angle: (i / bladeCount) * Math.PI * 2, key: i });
-    }
-    return items;
-  }, [bladeCount]);
-
-  return (
-    <group position={[0, 0.4, 0]}>
-      {/* Boxy Metal Casing (Reference: T-12 Cross Flow) */}
-      <mesh position={[0, 0, 0]}>
-        <boxGeometry args={[1.8, 1.8, length + 0.2]} />
-        <meshStandardMaterial color="#475569" metalness={0.7} roughness={0.5} transparent opacity={0.6} />
-      </mesh>
-      
-      {/* Casing Flanges / Ribs */}
-      {[-length/2 - 0.1, length/2 + 0.1].map((z, i) => (
-        <mesh key={`rib-${i}`} position={[0, 0, z]}>
-          <boxGeometry args={[1.9, 1.9, 0.05]} />
-          <meshStandardMaterial color="#334155" metalness={0.8} roughness={0.4} />
-        </mesh>
-      ))}
-
-      {/* Internal Rotating Runner */}
-      <group ref={runnerRef} rotation={[0, 0, 0]}>
-        {/* Main Shaft extending to pulley */}
-        <mesh position={[0, 0, -0.4]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.08, 0.08, length + 1.2, 16]} />
-          <meshStandardMaterial color="#94A3B8" metalness={0.9} roughness={0.2} />
-        </mesh>
-        {/* Hub Discs */}
-        {[-length/2, length/2].map((z, i) => (
-          <mesh key={`disc-${i}`} position={[0, 0, z]} rotation={[Math.PI / 2, 0, 0]}>
-            <cylinderGeometry args={[radius * 0.95, radius * 0.95, 0.04, 32]} />
-            <meshStandardMaterial color="#1E293B" metalness={0.8} roughness={0.3} />
-          </mesh>
-        ))}
-        {/* Blades */}
-        {blades.map(({ angle, key }) => {
-          const x = Math.cos(angle) * radius * 0.8;
-          const y = Math.sin(angle) * radius * 0.8;
-          return (
-            <mesh key={key} position={[x, y, 0]} rotation={[0, 0, angle + Math.PI / 4]}>
-              <boxGeometry args={[radius * 0.4, 0.02, length]} />
-              <meshStandardMaterial color="#0D9488" metalness={0.5} roughness={0.4} />
-            </mesh>
-          );
-        })}
-      </group>
-
-      {/* Bearing Housing (Front) with Vibration Sensor */}
-      <group position={[0, 0, -1.0]}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.2, 0.2, 0.3, 16]} />
-          <meshStandardMaterial color="#1E293B" metalness={0.8} roughness={0.2} />
-        </mesh>
-        {/* ADXL345 Sensor on Bearing */}
-        <group position={[0, 0.2, 0]}>
-          <mesh>
-            <boxGeometry args={[0.08, 0.02, 0.06]} />
-            <meshStandardMaterial color="#2563EB" roughness={0.8} />
-          </mesh>
-        </group>
-      </group>
-      
-      {/* Bearing Housing (Back) */}
-      <group position={[0, 0, 1.0]}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.2, 0.2, 0.3, 16]} />
-          <meshStandardMaterial color="#1E293B" metalness={0.8} roughness={0.2} />
-        </mesh>
-      </group>
-    </group>
-  );
 }
 
 // ═══════════════════════════════════════════════════════
-// GENERATOR & BELT DRIVE
+// CROSS-FLOW TURBINE MODEL — dengan animasi dinamis
 // ═══════════════════════════════════════════════════════
-function GeneratorAssembly({ tempStatus = 'normal', rotationSpeed = 1 }: { tempStatus?: string, rotationSpeed: number }) {
-  const pulleyRef = useRef<THREE.Group>(null!);
-  
-  // Generator pulley spins faster (e.g. 1:3 ratio)
-  useFrame((_state, delta) => {
-    if (pulleyRef.current) {
-      pulleyRef.current.rotation.z -= delta * rotationSpeed * 3;
-    }
-  });
-
-  const color = tempStatus === 'critical' ? '#EF4444' : tempStatus === 'warning' ? '#F59E0B' : '#3B82F6';
-
-  return (
-    <group position={[-2.5, 0.6, 0]}>
-      {/* Belt Drive System */}
-      {/* Turbine Pulley (Large) - Absolute position relative to Turbine Shaft */}
-      <group position={[2.5, -0.2, -1.4]}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.6, 0.6, 0.1, 32]} />
-          <meshStandardMaterial color="#111827" roughness={0.6} />
-        </mesh>
-      </group>
-
-      {/* Generator Pulley (Small) */}
-      <group position={[0, 0, -1.4]} ref={pulleyRef}>
-        <mesh rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.2, 0.2, 0.1, 32]} />
-          <meshStandardMaterial color="#111827" roughness={0.6} />
-        </mesh>
-        {/* Shaft */}
-        <mesh position={[0, 0, 0.4]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.06, 0.06, 1.0, 16]} />
-          <meshStandardMaterial color="#94A3B8" metalness={0.9} />
-        </mesh>
-      </group>
-
-      {/* Drive Belt connecting the two pulleys */}
-      <mesh position={[1.25, -0.1, -1.4]} rotation={[0, 0, -0.08]}>
-        <boxGeometry args={[2.5, 0.4, 0.05]} />
-        <meshStandardMaterial color="#000000" roughness={0.9} />
-      </mesh>
-      <mesh position={[1.25, -0.5, -1.4]} rotation={[0, 0, 0.08]}>
-        <boxGeometry args={[2.5, 0.4, 0.05]} />
-        <meshStandardMaterial color="#000000" roughness={0.9} />
-      </mesh>
-
-      {/* Generator Body (Green/Blue standard industrial color) */}
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.5, 0.5, 1.4, 24]} />
-        <meshStandardMaterial color="#059669" metalness={0.4} roughness={0.3} />
-      </mesh>
-      {/* Base Mount */}
-      <mesh position={[0, -0.6, 0]}>
-        <boxGeometry args={[0.8, 0.2, 1.0]} />
-        <meshStandardMaterial color="#1F2937" />
-      </mesh>
-
-      {/* Cooling fins */}
-      {[-0.5, -0.25, 0, 0.25, 0.5].map((z, i) => (
-        <mesh key={i} position={[0, 0, z]} rotation={[Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.52, 0.02, 4, 32]} />
-          <meshStandardMaterial color="#047857" metalness={0.3} roughness={0.4} />
-        </mesh>
-      ))}
-
-      {/* Status indicator light */}
-      <mesh position={[0, 0.55, 0.4]}>
-        <sphereGeometry args={[0.05, 12, 12]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={2} />
-      </mesh>
-
-      {/* SENSOR: DS18B20 (Temperature) Probe */}
-      <group position={[0.3, 0.4, 0]} rotation={[0, 0, -Math.PI / 4]}>
-        <mesh>
-          <cylinderGeometry args={[0.02, 0.02, 0.2, 8]} />
-          <meshStandardMaterial color="#D1D5DB" metalness={1} />
-        </mesh>
-        <mesh position={[0, 0.1, 0]}>
-          <boxGeometry args={[0.06, 0.08, 0.06]} />
-          <meshStandardMaterial color="#111827" />
-        </mesh>
-      </group>
-    </group>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// FOREBAY, PENSTOCK & FLOW SENSOR
-// ═══════════════════════════════════════════════════════
-function HydrologySystem() {
-  const pipeColor = "#94A3B8";
-
-  return (
-    <group>
-      {/* Forebay (Bak Penenang) at the top of the slope */}
-      <group position={[0, 4.5, -4.5]}>
-        {/* Concrete Pool */}
-        <mesh position={[0, -0.5, 0]}>
-          <boxGeometry args={[4, 1, 3]} />
-          <meshStandardMaterial color="#9CA3AF" roughness={0.9} />
-        </mesh>
-        {/* Water inside Forebay */}
-        <mesh position={[0, 0.01, 0]}>
-          <boxGeometry args={[3.6, 0.1, 2.6]} />
-          <meshStandardMaterial color="#0EA5E9" transparent opacity={0.7} roughness={0.1} />
-        </mesh>
-        {/* Trash Rack (Saringan Sampah) */}
-        <mesh position={[0, 0.5, 1.3]} rotation={[Math.PI / 8, 0, 0]}>
-          <boxGeometry args={[2, 1.5, 0.05]} />
-          <meshStandardMaterial color="#475569" wireframe />
-        </mesh>
-      </group>
-
-      {/* Penstock (Pipa Pesat) - Steep 45 degree angle into turbine casing */}
-      <mesh position={[0, 2.5, -2.5]} rotation={[Math.PI / 4, 0, 0]}>
-        <cylinderGeometry args={[0.3, 0.3, 5.0, 16]} />
-        <meshStandardMaterial color={pipeColor} metalness={0.6} roughness={0.4} />
-      </mesh>
-
-      {/* SENSOR: YF-S201 (Flow Meter) Inline on Penstock */}
-      <group position={[0, 2.8, -2.8]} rotation={[Math.PI / 4, 0, 0]}>
-        <mesh>
-          <cylinderGeometry args={[0.32, 0.32, 0.4, 16]} />
-          <meshStandardMaterial color="#FBBF24" metalness={0.3} roughness={0.7} />
-        </mesh>
-        <mesh position={[0, 0.3, 0]}>
-          <boxGeometry args={[0.2, 0.15, 0.2]} />
-          <meshStandardMaterial color="#111827" />
-        </mesh>
-      </group>
-
-      {/* Tailrace Outlet from bottom of turbine */}
-      <mesh position={[0, -0.4, 0.5]}>
-        <boxGeometry args={[1.6, 0.8, 1.5]} />
-        <meshStandardMaterial color="#9CA3AF" roughness={0.8} />
-      </mesh>
-    </group>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// CONTROL PANEL & POWER LINE
-// ═══════════════════════════════════════════════════════
-function ElectricalSystem() {
-  return (
-    <group>
-      {/* Control Panel near generator */}
-      <group position={[-4.0, 1.5, 0]} rotation={[0, Math.PI / 4, 0]}>
-        <mesh position={[0, -1.0, 0]}>
-          <cylinderGeometry args={[0.05, 0.05, 2.0, 8]} />
-          <meshStandardMaterial color="#9CA3AF" />
-        </mesh>
-        <mesh>
-          <boxGeometry args={[0.8, 1.0, 0.2]} />
-          <meshStandardMaterial color="#D1D5DB" metalness={0.6} roughness={0.5} />
-        </mesh>
-        {/* Raspberry Pi & INA219 */}
-        <mesh position={[-0.15, 0.1, 0.11]}>
-          <boxGeometry args={[0.2, 0.15, 0.02]} />
-          <meshStandardMaterial color="#10B981" />
-        </mesh>
-        <mesh position={[0.15, 0.1, 0.11]}>
-          <boxGeometry args={[0.15, 0.1, 0.02]} />
-          <meshStandardMaterial color="#8B5CF6" />
-        </mesh>
-      </group>
-
-      {/* Village Power Line */}
-      <group position={[-5.0, 4.0, -3.0]}>
-        <mesh position={[0, -2.5, 0]}>
-          <cylinderGeometry args={[0.1, 0.15, 7.0, 8]} />
-          <meshStandardMaterial color="#78350F" roughness={0.9} />
-        </mesh>
-        <mesh position={[0, 0.5, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.05, 0.05, 1.5, 8]} />
-          <meshStandardMaterial color="#78350F" roughness={0.9} />
-        </mesh>
-        {/* Wires heading to village */}
-        {[-0.6, 0, 0.6].map((z, i) => (
-          <mesh key={i} position={[2, 0.6, z]} rotation={[0, 0, Math.PI / 2]}>
-            <cylinderGeometry args={[0.005, 0.005, 4.0, 8]} />
-            <meshStandardMaterial color="#111827" />
-          </mesh>
-        ))}
-      </group>
-    </group>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// TERRAIN & RIVER SCENERY
-// ═══════════════════════════════════════════════════════
-function EnvironmentScenery() {
-  return (
-    <group>
-      {/* Powerhouse Foundation (Concrete floor for Turbine and Generator) */}
-      <mesh position={[-1.25, -0.2, 0]}>
-        <boxGeometry args={[5.5, 0.4, 4.0]} />
-        <meshStandardMaterial color="#D1D5DB" roughness={0.8} />
-      </mesh>
-      
-      {/* Steep Slope Earth */}
-      <mesh position={[0, 1.5, -4.0]} rotation={[-Math.PI / 6, 0, 0]}>
-        <boxGeometry args={[10, 0.5, 6.0]} />
-        <meshStandardMaterial color="#3F2E1E" roughness={0.9} />
-      </mesh>
-
-      {/* Downstream River */}
-      <mesh position={[0, -0.8, 4.0]}>
-        <boxGeometry args={[10, 0.5, 6.0]} />
-        <meshStandardMaterial color="#0284C7" transparent opacity={0.7} roughness={0.1} />
-      </mesh>
-      <mesh position={[0, -1.2, 4.0]}>
-        <boxGeometry args={[10, 0.5, 6.0]} />
-        <meshStandardMaterial color="#292524" roughness={0.9} />
-      </mesh>
-    </group>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// WATER PARTICLES
-// ═══════════════════════════════════════════════════════
-function WaterParticles({ flowRate = 0.5 }: { flowRate: number }) {
-  const particlesRef = useRef<THREE.Points>(null!);
-  const count = Math.floor(flowRate * 300);
-
-  const positions = useMemo(() => {
-    const pos = new Float32Array(count * 3);
-    for (let i = 0; i < count; i++) {
-      // Start in forebay
-      pos[i * 3] = (Math.random() - 0.5) * 1.5;
-      pos[i * 3 + 1] = 4.5;
-      pos[i * 3 + 2] = -4.5 + (Math.random() - 0.5);
-    }
-    return pos;
-  }, [count]);
-
-  useFrame((_state, delta) => {
-    if (!particlesRef.current) return;
-    const posArray = particlesRef.current.geometry.attributes.position.array as Float32Array;
-    for (let i = 0; i < count; i++) {
-      // If in forebay, move towards penstock
-      if (posArray[i * 3 + 1] > 3.5) {
-        posArray[i * 3] *= 0.95; // Narrow into pipe
-        posArray[i * 3 + 2] += delta * flowRate * 1.5;
-        if (posArray[i * 3 + 2] > -3.5) posArray[i * 3 + 1] -= 0.1; 
-      } 
-      // Falling down penstock
-      else if (posArray[i * 3 + 1] > 0.5) {
-        posArray[i * 3 + 1] -= delta * flowRate * 4.0;
-        posArray[i * 3 + 2] += delta * flowRate * 4.0;
-      }
-      // Splash out of tailrace
-      else {
-        posArray[i * 3 + 1] = -0.5;
-        posArray[i * 3 + 2] += delta * flowRate * 3.0;
-      }
-
-      // Reset when downstream
-      if (posArray[i * 3 + 2] > 5.0) {
-        posArray[i * 3] = (Math.random() - 0.5) * 1.5;
-        posArray[i * 3 + 1] = 4.5;
-        posArray[i * 3 + 2] = -5.0 + Math.random();
-      }
-    }
-    particlesRef.current.geometry.attributes.position.needsUpdate = true;
-  });
-
-  if (count === 0) return null;
-
-  return (
-    <points ref={particlesRef}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} count={count} array={positions} itemSize={3} />
-      </bufferGeometry>
-      <pointsMaterial color="#E0F2FE" size={0.08} transparent opacity={0.6} sizeAttenuation />
-    </points>
-  );
-}
-
-// ═══════════════════════════════════════════════════════
-// STATUS LABELS
-// ═══════════════════════════════════════════════════════
-function StatusLabel({ position, label, value, unit, status = 'normal', sensorName }: {
-  position: [number, number, number];
-  label: string;
-  value: string | number;
-  unit: string;
-  status?: string;
-  sensorName?: string;
+function CrossFlowTurbineModel({
+  flowRate,
+  isActive,
+  vibrationStatus,
+  generatorStatus,
+}: {
+  flowRate: number;
+  isActive: boolean;
+  vibrationStatus: string;
+  generatorStatus: string;
 }) {
-  const color = status === 'critical' ? '#EF4444' : status === 'warning' ? '#F59E0B' : '#10B981';
+  const { scene } = useGLTF('/turbin-cf.glb');
+
+  // Refs untuk objek yang perlu dirotasi
+  const turbineRef = useRef<THREE.Object3D | null>(null);
+  const genRef     = useRef<THREE.Object3D | null>(null);
+  // Fallback: jika nama tidak ditemukan, groupRef untuk muter semua model
+  const groupRef   = useRef<THREE.Group>(null!);
+
+  // Refs untuk bearing shields (material dinamis)
+  const shieldTurbineRef   = useRef<THREE.Object3D | null>(null);
+  const shieldPulleyRef    = useRef<THREE.Object3D | null>(null);
+  const shieldGeneratorRef = useRef<THREE.Object3D | null>(null);
+
+  // Clone scene & temukan objek berdasarkan nama
+  const clonedScene = useMemo(() => {
+    const clone = scene.clone(true);
+
+    turbineRef.current         = null;
+    genRef.current             = null;
+    shieldTurbineRef.current   = null;
+    shieldPulleyRef.current    = null;
+    shieldGeneratorRef.current = null;
+
+    // ─── SCAN: Gunakan EXACT match karena nama sudah diketahui dari console dump ───
+    clone.traverse((child) => {
+      const n = child.name;
+
+      // Objek dinamis (rotasi) — exact match prioritas tertinggi
+      if (n === 'Turbine')  { turbineRef.current = child; return; }
+      if (n === 'Gen')      { genRef.current     = child; return; }
+
+      // Shield bearings — nama sudah dikonfirmasi eksak oleh user
+      if (n === 'Shield_Bearing_Turbine')   { shieldTurbineRef.current   = child; return; }
+      if (n === 'Shield_Bearing_Pulley')    { shieldPulleyRef.current    = child; return; }
+      if (n === 'Shield_Bearing_Generator') { shieldGeneratorRef.current = child; return; }
+    });
+
+    // Log hasil untuk konfirmasi
+    console.log('[Turbine3D] Turbine:', turbineRef.current?.name ?? '❌ NOT FOUND');
+    console.log('[Turbine3D] Gen:',     genRef.current?.name     ?? '❌ NOT FOUND');
+    console.log('[Turbine3D] Shield_Bearing_Turbine:',   shieldTurbineRef.current?.name   ?? '❌');
+    console.log('[Turbine3D] Shield_Bearing_Pulley:',    shieldPulleyRef.current?.name    ?? '❌');
+    console.log('[Turbine3D] Shield_Bearing_Generator:', shieldGeneratorRef.current?.name ?? '❌');
+
+    return clone;
+  }, [scene]);
+
+  // Update warna bearing saat status berubah
+  useEffect(() => {
+    applyBearingMaterial(shieldTurbineRef.current,   vibrationStatus);
+    applyBearingMaterial(shieldPulleyRef.current,    vibrationStatus);
+    applyBearingMaterial(shieldGeneratorRef.current, generatorStatus);
+  }, [vibrationStatus, generatorStatus, clonedScene]);
+
+  // Speed SELALU aktif selama flowRate > 0 — tidak bergantung isActive
+  // Hardcode minimum 2.0 rad/s agar rotasi pasti terlihat
+  const speedRef = useRef(2.0);
+  useEffect(() => {
+    const baseSpeed = flowRate > 0.05
+      ? Math.max(2.0, (flowRate / 0.55) * 3.0)
+      : 0;
+    speedRef.current = baseSpeed;
+    console.log('[Turbine3D] speed set to:', baseSpeed.toFixed(2), ' flowRate:', flowRate);
+  }, [flowRate]);
+
+  useFrame((_, delta) => {
+    const spd = speedRef.current;
+    if (spd <= 0) return;
+
+    // Turbine runner — coba sumbu Y (cross-flow runner dilihat dari samping)
+    if (turbineRef.current) {
+      turbineRef.current.rotation.y += spd * delta;
+    }
+
+    // Generator rotor — 2× kecepatan turbine
+    if (genRef.current) {
+      genRef.current.rotation.y += spd * 2 * delta;
+    }
+  });
+
   return (
-    <Html position={position} center distanceFactor={12}>
-      <div className="bg-white/95 backdrop-blur-sm rounded-lg px-2.5 py-1.5 shadow-lg border border-slate-200 pointer-events-none select-none flex flex-col items-center">
-        {sensorName && <div className="bg-slate-800 text-white text-[8px] font-mono px-1.5 py-0.5 rounded uppercase mb-1">{sensorName}</div>}
-        <p className="text-[9px] text-slate-500 font-medium">{label}</p>
-        <p className="text-sm font-bold font-mono" style={{ color }}>{value} <span className="text-[9px] text-slate-400">{unit}</span></p>
-      </div>
-    </Html>
+    <group ref={groupRef} scale={[2.5, 2.5, 2.5]} rotation={[0, Math.PI / 4, 0]}>
+      <primitive object={clonedScene} />
+    </group>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// GROUND PLANE
+// ═══════════════════════════════════════════════════════
+function Ground() {
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.5, 0]}>
+      <planeGeometry args={[20, 20]} />
+      <meshStandardMaterial color="#CBD5E1" roughness={0.9} metalness={0.0} />
+    </mesh>
   );
 }
 
 // ═══════════════════════════════════════════════════════
 // MAIN 3D SCENE
 // ═══════════════════════════════════════════════════════
-function TurbineScene({ summary, components }: { summary: SummaryData; components?: ComponentsResponse }) {
-  const flowRate = summary.current.flow_rate;
-  const isActive = summary.turbine_active;
-  const rotationSpeed = isActive ? Math.max(0.3, flowRate * 4) : 0;
+function TurbineScene({
+  summary,
+  components,
+}: {
+  summary: SummaryData;
+  components?: ComponentsResponse;
+}) {
+  const isActive      = summary.turbine_active;
+  const flowRate      = summary.current.flow_rate;
+  const bearingStatus = components?.bearing?.status   || 'normal';
+  const genStatus     = components?.generator?.status || 'normal';
 
-  const bearingStatus = components?.bearing?.status || 'normal';
-  const genStatus = components?.generator?.status || 'normal';
+  // Kecepatan orbit kamera (lambat saat idle agar tampak elegan)
+  const autoRotateSpeed = isActive ? 0.6 : 0.2;
 
   return (
     <>
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[10, 15, 10]} intensity={1.5} castShadow shadow-mapSize={2048} />
-      <directionalLight position={[-10, 5, -5]} intensity={0.6} color="#BAE6FD" />
-      <pointLight position={[-2, 2, 0]} intensity={0.5} color="#10B981" distance={8} />
+      {/* Pencahayaan: multi-layer tanpa shadow pipeline */}
+      <ambientLight intensity={1.0} color="#e0f2fe" />
+      <directionalLight position={[8, 12, 8]}  intensity={2.0} color="#ffffff" />
+      <directionalLight position={[-6, 4, -4]} intensity={0.6} color="#bae6fd" />
+      <pointLight       position={[0, 4, 2]}   intensity={0.8} color="#0d9488" distance={12} />
+      <hemisphereLight  args={['#dbeafe', '#94a3b8', 0.5]} />
 
+      <Ground />
+
+      {/* === MODEL TURBIN CROSS-FLOW — DINAMIS === */}
       <group position={[0, -0.5, 0]}>
-        <EnvironmentScenery />
-        <HydrologySystem />
-        <TurbineAssembly rotationSpeed={rotationSpeed} />
-        <GeneratorAssembly tempStatus={genStatus} rotationSpeed={rotationSpeed} />
-        <ElectricalSystem />
-        <WaterParticles flowRate={isActive ? flowRate : 0} />
-
-        {/* Labels Map exactly to Sensor Locations */}
-        <StatusLabel
-          position={[0, 1.0, -1.0]}
-          label="Vibrasi Turbin"
-          sensorName="ADXL345"
-          value={summary.current.vibration.toFixed(1)}
-          unit="mm/s"
-          status={bearingStatus}
-        />
-        <StatusLabel
-          position={[-2.5, 1.5, 0]}
-          label="Suhu Bearing"
-          sensorName="DS18B20"
-          value={summary.current.gen_temp.toFixed(0)}
-          unit="°C"
-          status={genStatus}
-        />
-        <StatusLabel
-          position={[0, 3.8, -2.8]}
-          label="Debit Air"
-          sensorName="YF-S201"
-          value={summary.current.flow_rate.toFixed(2)}
-          unit="m³/s"
-          status="normal"
-        />
-        <StatusLabel
-          position={[-4.0, 2.5, 0]}
-          label="Tegangan & Arus"
-          sensorName="INA219"
-          value={`${summary.current.voltage.toFixed(0)}V / ${summary.current.current.toFixed(0)}A`}
-          unit=""
-          status="normal"
+        <CrossFlowTurbineModel
+          flowRate={flowRate}
+          isActive={isActive}
+          vibrationStatus={bearingStatus}
+          generatorStatus={genStatus}
         />
       </group>
 
       <OrbitControls
+        makeDefault
         enablePan={true}
-        minDistance={5}
-        maxDistance={25}
-        maxPolarAngle={Math.PI / 2 - 0.05}
+        enableZoom={true}
+        enableRotate={true}
+        enableDamping={true}
+        dampingFactor={0.25}
+        minDistance={2}
+        maxDistance={18}
         autoRotate={false}
-        target={[-1, 1, 0]} // Focus point roughly at turbine/generator area
+        target={[0, 0, 0]}
+        zoomSpeed={1.2}
+        rotateSpeed={1.2}
       />
     </>
   );
 }
 
-export default function Turbine3D({ summary, components }: { summary: SummaryData; components?: ComponentsResponse }) {
-  const isActive = summary.turbine_active;
-  const power = summary.current.power_kw;
-  const efficiency = Math.min(100, Math.round((power / 50) * 100));
+// ═══════════════════════════════════════════════════════
+// SENSOR CHIP — komponen 2D untuk overlay panel
+// ═══════════════════════════════════════════════════════
+function SensorChip({ label, sensorName, value, unit, status = 'normal' }: {
+  label: string;
+  sensorName: string;
+  value: string;
+  unit: string;
+  status?: string;
+}) {
+  const dotColor =
+    status === 'critical' ? 'bg-red-500 shadow-red-400' :
+    status === 'warning'  ? 'bg-amber-400 shadow-amber-300' :
+                            'bg-emerald-500 shadow-emerald-400';
+  const valColor =
+    status === 'critical' ? 'text-red-400' :
+    status === 'warning'  ? 'text-amber-400' :
+                            'text-teal-400';
+  return (
+    <div className="flex items-center gap-2 bg-slate-900/75 backdrop-blur-md border border-white/10 rounded-lg px-2.5 py-1.5">
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 shadow-[0_0_5px] ${dotColor}`} />
+      <div className="flex flex-col leading-none">
+        <span className="text-[8px] font-mono text-slate-400 uppercase tracking-wider">{sensorName} · {label}</span>
+        <span className={`text-[11px] font-bold font-mono mt-0.5 ${valColor}`}>
+          {value} <span className="text-slate-500 font-normal text-[9px]">{unit}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// ROOT EXPORT — wrapper dengan Canvas
+// ═══════════════════════════════════════════════════════
+export default function Turbine3D({
+  summary,
+  components,
+}: {
+  summary: SummaryData;
+  components?: ComponentsResponse;
+}) {
+  const isActive     = summary.turbine_active;
+  const power        = summary.current.power_kw;
+  const efficiency   = Math.min(100, Math.round((power / 50) * 100));
+  const bearingStatus = components?.bearing?.status   || 'normal';
+  const genStatus     = components?.generator?.status || 'normal';
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm overflow-hidden">
+      {/* Header */}
       <div className="px-6 pt-5 pb-3 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
-            Digital Twin — PLTMH Cross-Flow (PUSAIR Ref)
+            Digital Twin — PLTMH Turbin Cross-Flow
           </h3>
-          <p className="text-[10px] text-slate-400 mt-0.5">Belt-drive turbin dan generator dengan Forebay dan Penstock.</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            Model 3D interaktif · Sensor real-time terintegrasi
+          </p>
         </div>
-        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${isActive ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+        <span
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+            isActive
+              ? 'bg-teal-50 text-teal-700 border-teal-200'
+              : 'bg-slate-100 text-slate-500 border-slate-200'
+          }`}
+        >
           {isActive && (
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500" />
             </span>
           )}
           {isActive ? 'Beroperasi' : 'Idle'}
         </span>
       </div>
 
-      <div className="h-[500px] bg-gradient-to-b from-sky-50 to-slate-200 relative">
-        <Canvas shadows camera={{ position: [12, 8, 12], fov: 40 }} dpr={[1, 2]} gl={{ antialias: true }}>
+      {/* 3D Canvas — frameloop=always karena ada animasi rotasi berkelanjutan */}
+      <div className="h-[500px] bg-gradient-to-b from-slate-100 to-slate-300 relative">
+        <Canvas
+          camera={{ position: [5, 3, 6], fov: 45 }}
+          dpr={[1, 1.5]}
+          frameloop="always"
+          gl={{
+            antialias: false,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            powerPreference: 'high-performance',
+          }}
+          performance={{ min: 0.5 }}
+        >
           <Suspense fallback={null}>
             <TurbineScene summary={summary} components={components} />
           </Suspense>
         </Canvas>
-        
+
+        {/* ── SENSOR OVERLAY (pojok kanan atas) ── */}
+        <div className="absolute top-3 right-3 flex flex-col gap-1.5 pointer-events-none">
+          <SensorChip
+            label="Vibrasi Turbin"
+            sensorName="ADXL345"
+            value={summary.current.vibration.toFixed(1)}
+            unit="mm/s"
+            status={bearingStatus}
+          />
+          <SensorChip
+            label="Suhu Bearing"
+            sensorName="DS18B20"
+            value={summary.current.gen_temp.toFixed(0)}
+            unit="°C"
+            status={genStatus}
+          />
+          <SensorChip
+            label="Debit Air"
+            sensorName="YF-S201"
+            value={summary.current.flow_rate.toFixed(2)}
+            unit="m³/s"
+            status="normal"
+          />
+          <SensorChip
+            label="Tegangan & Arus"
+            sensorName="INA219"
+            value={`${summary.current.voltage.toFixed(0)}V / ${summary.current.current?.toFixed(0) ?? '0'}A`}
+            unit=""
+            status="normal"
+          />
+          <SensorChip
+            label="RPM Turbin"
+            sensorName="ENCODER"
+            value={(summary.current.rpm ?? 0).toFixed(0)}
+            unit="rpm"
+            status={(summary.current.rpm ?? 750) < 712 || (summary.current.rpm ?? 750) > 787 ? 'warning' : 'normal'}
+          />
+          <SensorChip
+            label="Frekuensi"
+            sensorName="GOVERNOR"
+            value={(summary.current.frequency ?? 50).toFixed(2)}
+            unit="Hz"
+            status={(summary.current.frequency ?? 50) < 49.5 || (summary.current.frequency ?? 50) > 50.5 ? 'warning' : 'normal'}
+          />
+        </div>
+
+        {/* ── KPI bawah ── */}
         <div className="absolute bottom-3 left-3 right-3 flex justify-between pointer-events-none">
           <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-sm border border-slate-200/60">
             <span className="text-[10px] text-slate-400">Total Daya Output</span>
-            <p className="text-base font-bold text-slate-800 font-mono">{power.toFixed(1)} <span className="text-xs text-slate-400">kW</span></p>
+            <p className="text-base font-bold text-slate-800 font-mono">
+              {power.toFixed(1)} <span className="text-xs text-slate-400">kW</span>
+            </p>
           </div>
           <div className="bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-sm border border-slate-200/60 text-right">
             <span className="text-[10px] text-slate-400">Efisiensi Sistem</span>
-            <p className={`text-base font-bold font-mono ${efficiency >= 70 ? 'text-emerald-600' : efficiency >= 40 ? 'text-amber-600' : 'text-rose-600'}`}>
+            <p
+              className={`text-base font-bold font-mono ${
+                efficiency >= 70
+                  ? 'text-emerald-600'
+                  : efficiency >= 40
+                  ? 'text-amber-600'
+                  : 'text-rose-600'
+              }`}
+            >
               {efficiency}%
             </p>
           </div>
@@ -527,4 +378,3 @@ export default function Turbine3D({ summary, components }: { summary: SummaryDat
     </div>
   );
 }
-

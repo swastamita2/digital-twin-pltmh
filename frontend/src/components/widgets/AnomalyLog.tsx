@@ -18,7 +18,7 @@ export default function AnomalyLog({ anomalies }: Props) {
           Log Deteksi Anomali
         </h3>
         <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-2 py-1 rounded-md">
-          {anomalies.anomaly_days}/{anomalies.total_days_analyzed} hari
+          {anomalies.anomaly_days}/{anomalies.total_days_analyzed} sampel
         </span>
       </div>
 
@@ -30,13 +30,13 @@ export default function AnomalyLog({ anomalies }: Props) {
         </div>
         <div className="flex-1 bg-slate-50 rounded-lg p-2.5 text-center border border-slate-100">
           <p className="text-lg font-bold text-slate-700 font-mono">{anomalies.anomaly_days}</p>
-          <p className="text-[10px] text-slate-500">Hari Anomali</p>
+          <p className="text-[10px] text-slate-500">Sampel Anomali</p>
         </div>
       </div>
 
       {/* Event list */}
-      <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-        {events.length === 0 ? (
+      <div className="space-y-2 max-h-70 overflow-y-auto pr-1">
+          {events.length === 0 ? (
           <p className="text-xs text-slate-400 text-center py-4">Tidak ada anomali terdeteksi</p>
         ) : (
           events.slice(0, 15).map((event, i) => (

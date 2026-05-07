@@ -6,18 +6,31 @@ import {
   ComponentsResponse, AlertsResponse, TechnoEconomics, EdgeMetricsResponse
 } from '../lib/api';
 
-const MOCK_TIMESERIES = Array.from({ length: 24 }).map((_, i) => ({
-  time: `10:${i.toString().padStart(2, '0')}`,
-  power_kw: 240 + Math.sin(i) * 10,
-  flow_rate: 1.8 + Math.cos(i) * 0.1,
-  efficiency: 88 + Math.sin(i) * 2,
-  load: 80 + Math.cos(i) * 2,
-  frequency: 50 + (Math.sin(i) * 0.1),
-  gen_temp: 68 + Math.cos(i) * 2,
-  water_temp: 18 + Math.sin(i),
-  intake_level: 1.4 + Math.cos(i) * 0.1,
-  tailrace_level: 0.9 + Math.sin(i) * 0.1,
-}));
+const MOCK_TIMESERIES = Array.from({ length: 60 }).map((_, i) => {
+  const baseFlow = 0.55;
+  const flow = baseFlow + Math.sin(i / 6) * 0.08;
+  const power = 40 + Math.sin(i / 5) * 6;
+  const efficiency = Math.min(100, (power / 50) * 100);
+  const load = efficiency;
+  const frequency = 50 + (load - 80) * 0.01;
+  return {
+    time: `10:${i.toString().padStart(2, '0')}`,
+    power_kw: power,
+    flow_rate: flow,
+    vibration: 2.8 + Math.sin(i / 4) * 0.4,
+    gen_temp: 58 + Math.cos(i / 6) * 1.5,
+    voltage: 220 + Math.sin(i / 5) * 3,
+    current: 180 + Math.cos(i / 7) * 4,
+    rpm: 750 + (flow - baseFlow) * 120,
+    head_pressure: 1.45 + (flow - baseFlow) * 0.6,
+    efficiency,
+    load,
+    frequency,
+    water_temp: 18 + (flow - baseFlow) * 4,
+    intake_level: 1.4 + (flow - baseFlow) * 0.3,
+    tailrace_level: 0.9 + (flow - baseFlow) * 0.2,
+  };
+});
 
 export function useDigitalTwinData() {
   const [timeseries, setTimeseries] = useState<DataPoint[]>([]);
@@ -39,12 +52,12 @@ export function useDigitalTwinData() {
       setLoading(true);
       setError(null);
       const [ts, summ, spcV, spcT, spcF, anom, comp, alts, te, sens] = await Promise.all([
-        fetchTimeseries(60),
+        fetchTimeseries(600),
         fetchSummary(),
-        fetchSPC('vibration', 60),
-        fetchSPC('gen_temp', 60),
-        fetchSPC('flow_rate', 60),
-        fetchAnomalies(30),
+        fetchSPC('vibration', 600, true),
+        fetchSPC('gen_temp', 600, true),
+        fetchSPC('flow_rate', 600, false),
+        fetchAnomalies(600),
         fetchComponents(),
         fetchAlerts(),
         fetchTechnoEconomics(),
@@ -54,16 +67,33 @@ export function useDigitalTwinData() {
       
       // Clean Architecture: Transform raw API DataPoint to UI-ready ChartData here
       if (ts && ts.length > 0) {
-        const mappedData = ts.map(pt => ({
-          ...pt,
-          time: pt.date ? new Date(pt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '00:00',
-          efficiency: pt.power_kw ? Math.min(100, (pt.power_kw / 50) * 100) : 88,
-          load: pt.power_kw ? Math.min(100, (pt.power_kw / 50) * 100) : 80,
-          frequency: 50 + (Math.random() * 0.2 - 0.1),
-          water_temp: 18 + Math.random(),
-          intake_level: 1.4 + Math.random() * 0.1,
-          tailrace_level: 0.9 + Math.random() * 0.1,
-        }));
+        const baseFlow = 0.55;
+        const mappedData = ts.map(pt => {
+          const flow = pt.flow_rate ?? 0;
+          const power = pt.power_kw ?? 0;
+          const efficiency = power ? Math.min(100, (power / 50) * 100) : 0;
+          const load = efficiency;
+          const frequency = 50 + (load - 80) * 0.01;
+          const intakeLevel = pt.head_pressure ?? (1.4 + (flow - baseFlow) * 0.3);
+          const tailraceLevel = 0.9 + (flow - baseFlow) * 0.2;
+          const waterTemp = 18 + (flow - baseFlow) * 4 + (pt.gen_temp ? (pt.gen_temp - 58) * 0.02 : 0);
+          const rpm = pt.rpm ?? (750 + (flow - baseFlow) * 120);
+
+          return {
+            ...pt,
+            time: pt.date ? new Date(pt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '00:00',
+            efficiency,
+            load,
+            // Frekuensi: ambil dari backend dulu, fallback ke rumus RPM 8-pole jika tidak ada
+            frequency: pt.frequency != null
+              ? Number(pt.frequency.toFixed(2))
+              : Number(((rpm * 8) / 120).toFixed(2)),
+            water_temp: Number(waterTemp.toFixed(2)),
+            intake_level: Number(intakeLevel.toFixed(3)),
+            tailrace_level: Number(tailraceLevel.toFixed(3)),
+            rpm: Number(rpm.toFixed(1)),
+          };
+        });
         setChartData(mappedData);
       } else {
         setChartData(MOCK_TIMESERIES);
@@ -88,7 +118,8 @@ export function useDigitalTwinData() {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 60000);
+    // Mengubah polling interval menjadi 5 detik (5000ms) untuk efek "Live Streaming"
+    const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, []);
 

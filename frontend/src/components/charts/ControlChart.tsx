@@ -3,13 +3,32 @@
 import React from 'react';
 import {
   ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, ReferenceLine, Scatter
+  Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts';
 import { SPCData } from '@/lib/api';
 
 interface Props {
   spcData: SPCData;
   height?: number;
+}
+
+// Format tanggal dari backend: "2026-05-01T09:59:59.900" → "09:59"
+function formatXTick(val: string): string {
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return val;
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+// Format tooltip: tampilkan tanggal + waktu lengkap
+function formatTooltipDate(val: string): string {
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return val;
+  return d.toLocaleString('id-ID', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
 }
 
 const CustomDot = (props: any) => {
@@ -29,17 +48,20 @@ const CustomDot = (props: any) => {
   return <circle cx={cx} cy={cy} r={3} fill="#0D9488" stroke="none" />;
 };
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+const CustomTooltip = ({ active, payload }: any) => {
   if (!active || !payload || !payload.length) return null;
   const point = payload[0]?.payload;
   if (!point) return null;
 
   return (
     <div className="bg-white/95 backdrop-blur-sm rounded-xl px-4 py-3 shadow-lg border border-slate-100">
-      <p className="font-semibold text-slate-800 text-sm mb-1">{point.date}</p>
+      <p className="font-semibold text-slate-800 text-xs mb-1">{formatTooltipDate(point.date)}</p>
       <p className="text-sm text-slate-600">
-        Nilai: <span className="font-bold font-mono">{point.value}</span>
+        Nilai: <span className="font-bold font-mono">{Number(point.value).toFixed(4)}</span>
       </p>
+      {point.raw_value != null && (
+        <p className="text-xs text-slate-400">Raw: {Number(point.raw_value).toFixed(4)}</p>
+      )}
       {point.out_of_control && (
         <p className="text-xs text-rose-600 font-semibold mt-1">⚠ Out of Control (di luar 3σ)</p>
       )}
@@ -51,10 +73,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export default function ControlChart({ spcData, height = 320 }: Props) {
+  const unit = spcData.unit ? ` (${spcData.unit})` : '';
+
   return (
     <div style={{ height }} className="w-full mt-3">
       <ResponsiveContainer width="100%" height="100%">
-        <ComposedChart data={spcData.data} margin={{ top: 15, right: 25, left: 0, bottom: 0 }}>
+        <ComposedChart data={spcData.data} margin={{ top: 15, right: 60, left: 0, bottom: 20 }}>
           <defs>
             <linearGradient id={`grad-${spcData.parameter}`} x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#0D9488" stopOpacity={0.08} />
@@ -65,43 +89,54 @@ export default function ControlChart({ spcData, height = 320 }: Props) {
           <XAxis
             dataKey="date"
             tick={{ fontSize: 10, fill: '#94A3B8' }}
-            tickFormatter={(val) => {
-              const d = new Date(val);
-              return `${d.getDate()}/${d.getMonth() + 1}`;
-            }}
+            tickFormatter={formatXTick}
             tickMargin={8}
-            minTickGap={40}
+            minTickGap={60}
+            label={{ value: 'Waktu (HH:MM)', position: 'insideBottom', offset: -12, fontSize: 10, fill: '#94A3B8' }}
           />
           <YAxis
             tick={{ fontSize: 10, fill: '#94A3B8' }}
             axisLine={false}
             tickLine={false}
             domain={['auto', 'auto']}
+            width={45}
           />
           <Tooltip content={<CustomTooltip />} />
 
-          {/* UCL / LCL lines */}
+          {/* UCL / LCL — batas kontrol 3-sigma */}
           <ReferenceLine
             y={spcData.ucl}
             stroke="#EF4444"
             strokeDasharray="6 3"
-            label={{ value: `UCL ${spcData.ucl}`, position: 'right', fill: '#EF4444', fontSize: 10 }}
+            label={{ value: 'UCL', position: 'right', fill: '#EF4444', fontSize: 10 }}
           />
           <ReferenceLine
             y={spcData.lcl}
             stroke="#EF4444"
             strokeDasharray="6 3"
-            label={{ value: `LCL ${spcData.lcl}`, position: 'right', fill: '#EF4444', fontSize: 10 }}
+            label={{ value: 'LCL', position: 'right', fill: '#EF4444', fontSize: 10 }}
           />
-          {/* Warning limits (2-sigma) */}
-          <ReferenceLine y={spcData.uwl} stroke="#F59E0B" strokeDasharray="3 3" strokeOpacity={0.5} />
-          <ReferenceLine y={spcData.lwl} stroke="#F59E0B" strokeDasharray="3 3" strokeOpacity={0.5} />
-          {/* Center line (mean) */}
+          {/* Warning limits — batas 2-sigma */}
+          <ReferenceLine
+            y={spcData.uwl}
+            stroke="#F59E0B"
+            strokeDasharray="3 3"
+            strokeOpacity={0.5}
+            label={{ value: 'UWL', position: 'right', fill: '#F59E0B', fontSize: 9 }}
+          />
+          <ReferenceLine
+            y={spcData.lwl}
+            stroke="#F59E0B"
+            strokeDasharray="3 3"
+            strokeOpacity={0.5}
+            label={{ value: 'LWL', position: 'right', fill: '#F59E0B', fontSize: 9 }}
+          />
+          {/* Center line — x̄ (mean) */}
           <ReferenceLine
             y={spcData.mean}
             stroke="#3B82F6"
             strokeDasharray="8 4"
-            label={{ value: `X̄ ${spcData.mean}`, position: 'right', fill: '#3B82F6', fontSize: 10 }}
+            label={{ value: 'X̄', position: 'right', fill: '#3B82F6', fontSize: 10 }}
           />
 
           {/* Data area + line */}

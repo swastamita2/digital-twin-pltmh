@@ -8,9 +8,9 @@ Set-Location -Path "backend"
 if (!(Test-Path -Path "venv")) {
     Write-Host "Virtual environment not found. Creating venv..." -ForegroundColor Magenta
     python -m venv venv
-    Write-Host "Installing Python dependencies..." -ForegroundColor Magenta
-    .\venv\Scripts\pip install -r requirements.txt
 }
+Write-Host "Installing Python dependencies..." -ForegroundColor Magenta
+.\venv\Scripts\pip install -r requirements.txt
 Set-Location -Path ".."
 
 # Check and Setup Frontend
@@ -23,8 +23,8 @@ if (!(Test-Path -Path "node_modules")) {
 Set-Location -Path ".."
 
 # Start Backend
-Write-Host "Starting Flask Backend on port 5000..." -ForegroundColor Green
-Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "Set-Location -Path 'backend' ; .\venv\Scripts\python.exe app.py"
+Write-Host "Starting FastAPI Backend on port 5000..." -ForegroundColor Green
+Start-Process -NoNewWindow -FilePath "powershell.exe" -ArgumentList "-Command", "Set-Location -Path 'backend' ; .\venv\Scripts\python.exe -m uvicorn app:app --reload --port 5000"
 
 # Start Frontend
 Write-Host "Starting Next.js Frontend on port 3000..." -ForegroundColor Green
